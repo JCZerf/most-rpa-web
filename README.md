@@ -39,6 +39,8 @@ O endpoint `app/api/make/route.ts` valida a chave recebida no cabeçalho `x-acce
 ```bash
 MAKE_WEBHOOK_URL=https://hook.make.com/...
 MAKE_FRONT_ACCESS_KEY=sua-chave-secreta
+Consulta_key=sua-chave-make
+MAKE_API_KEY_HEADER=x-api-key
 ```
 
 Use um arquivo `.env` local (não versionado) para guardar esses valores. O `.env.example` continua como referência para quem for usar.

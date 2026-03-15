@@ -2,25 +2,33 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 type FormValues = {
-  id_consulta: string;
   consulta: string;
-  refinar_busca: string;
+  refinar_busca: boolean;
 };
 
 type RunResult = {
   timestamp: string;
   success: boolean;
   status?: number;
-  error?: string;
-  data?: unknown;
+  message: string;
 };
 
 const DEFAULT_FORM: FormValues = {
-  id_consulta: "demo-cpf-001",
-  consulta: "A LIDA PEREIRA FIALHO",
-  refinar_busca: "false",
+  consulta: "",
+  refinar_busca: false,
 };
 
 const STORAGE_KEY = "make_front_access_key";
@@ -30,7 +38,7 @@ export default function ConsultaPage() {
   const [authKey, setAuthKey] = useState("");
   const [formValues, setFormValues] = useState<FormValues>(DEFAULT_FORM);
   const [submitBusy, setSubmitBusy] = useState(false);
-  const [runs, setRuns] = useState<RunResult[]>([]);
+  const [latestRun, setLatestRun] = useState<RunResult | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,18 +50,16 @@ export default function ConsultaPage() {
     setAuthKey(stored);
   }, [router]);
 
-  const latestRun = runs[0];
-
   const feedback = useMemo(() => {
     if (!latestRun) {
-      return "Submeta os dados acima para acionar o MAKE.";
+      return "Preencha o campo e clique em Consultar.";
     }
     if (latestRun.success) {
       return `Última execução em ${new Date(latestRun.timestamp).toLocaleTimeString(
         "pt-BR"
       )}`;
     }
-    return latestRun.error ?? "Ocorreu um erro.";
+    return latestRun.message;
   }, [latestRun]);
 
   const handleLogout = () => {
@@ -61,7 +67,10 @@ export default function ConsultaPage() {
     router.replace("/login");
   };
 
-  const handleFormChange = (field: keyof FormValues, value: string) => {
+  const handleFormChange = (
+    field: keyof FormValues,
+    value: string | boolean
+  ) => {
     setFormValues((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -76,145 +85,137 @@ export default function ConsultaPage() {
     setSubmitBusy(true);
     setAuthError(null);
     try {
+      const id_consulta =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `consulta-${Date.now()}`;
       const response = await fetch("/api/make", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-access-key": authKey,
         },
-        body: JSON.stringify(formValues),
+        body: JSON.stringify({
+          ...formValues,
+          id_consulta,
+        }),
       });
 
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        const errorMessage = payload?.error ?? "Erro ao chamar o MAKE";
-        setRuns((prev) => [
-          {
-            timestamp: new Date().toISOString(),
-            success: false,
-            status: response.status,
-            error: errorMessage,
-            data: payload?.details,
-          },
-          ...prev,
-        ]);
+        const errorMessage =
+          payload?.error === "O hook do MAKE respondeu com erro"
+            ? "A automação recusou a chamada. Verifique a chave/API key do webhook."
+            : "Não foi possível realizar a consulta no momento.";
+        setLatestRun({
+          timestamp: new Date().toISOString(),
+          success: false,
+          status: response.status,
+          message: errorMessage,
+        });
         return;
       }
 
-      setRuns((prev) => [
-        {
-          timestamp: new Date().toISOString(),
-          success: true,
-          status: payload?.status ?? response.status,
-          data: payload?.data ?? payload,
-        },
-        ...prev,
-      ]);
+      setLatestRun({
+        timestamp: new Date().toISOString(),
+        success: true,
+        status: payload?.status ?? response.status,
+        message: "Consulta enviada e processada com sucesso.",
+      });
     } finally {
       setSubmitBusy(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
+    <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-12">
-        <header className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-white/5 p-6 shadow-lg shadow-slate-900/40 md:flex-row md:items-center md:justify-between">
+        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
-            <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
-              MAKE Light
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">
+              Transparência Coleta
             </p>
-            <h1 className="text-3xl font-semibold">Consulta</h1>
-            <p className="text-slate-300">
+            <h1 className="text-3xl font-semibold tracking-tight">Consulta</h1>
+            <p className="text-sm text-muted-foreground">
               Preencha os parâmetros e confira o retorno da automação.
             </p>
           </div>
-          <button
-            className="rounded border border-slate-700 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-slate-200 transition hover:border-white"
-            onClick={handleLogout}
-          >
+          <Button variant="outline" onClick={handleLogout}>
             Sair
-          </button>
+          </Button>
         </header>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Dados do hook</h2>
-            <span className="text-sm text-slate-400">{feedback}</span>
-          </div>
+        <Card className="w-full max-w-2xl self-center">
+          <CardHeader>
+            <CardTitle>Consulta</CardTitle>
+            <CardDescription>{feedback}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form className="grid w-full gap-4" onSubmit={handleSubmit}>
+              <div className="space-y-1.5">
+                <Label htmlFor="consulta">Nome, CPF ou NIS</Label>
+                <Input
+                  id="consulta"
+                  value={formValues.consulta}
+                  onChange={(event) =>
+                    handleFormChange("consulta", event.target.value)
+                  }
+                  placeholder="Digite o dado para consulta"
+                />
+              </div>
 
-          <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
-            <label className="text-sm text-slate-300">
-              id_consulta
-              <input
-                className="mt-1 w-full rounded border border-slate-700 bg-black/20 px-3 py-2 text-sm text-white focus:border-white focus:outline-none"
-                value={formValues.id_consulta}
-                onChange={(event) =>
-                  handleFormChange("id_consulta", event.target.value)
-                }
-                placeholder="demo-cpf-001"
-              />
-            </label>
+              <div className="flex items-center justify-between rounded-md border border-input px-3 py-2">
+                <Label htmlFor="beneficiario-switch" className="text-sm font-normal">
+                  Apenas Beneficiário de Programa Social
+                </Label>
+                <Switch
+                  id="beneficiario-switch"
+                  checked={formValues.refinar_busca}
+                  onCheckedChange={(checked) =>
+                    handleFormChange("refinar_busca", checked)
+                  }
+                  className="border border-slate-400 data-checked:border-black data-checked:bg-black data-unchecked:bg-slate-300"
+                />
+              </div>
 
-            <label className="text-sm text-slate-300">
-              consulta
-              <input
-                className="mt-1 w-full rounded border border-slate-700 bg-black/20 px-3 py-2 text-sm text-white focus:border-white focus:outline-none"
-                value={formValues.consulta}
-                onChange={(event) =>
-                  handleFormChange("consulta", event.target.value)
-                }
-                placeholder="Nome do cliente ou CNPJ"
-              />
-            </label>
-
-            <label className="text-sm text-slate-300">
-              refinar_busca
-              <select
-                className="mt-1 w-full rounded border border-slate-700 bg-black/20 px-3 py-2 text-sm text-white focus:border-white focus:outline-none"
-                value={formValues.refinar_busca}
-                onChange={(event) =>
-                  handleFormChange("refinar_busca", event.target.value)
-                }
+              <Button
+                type="submit"
+                className="bg-black text-white hover:bg-black/90"
+                disabled={submitBusy}
               >
-                <option value="false">false</option>
-                <option value="true">true</option>
-              </select>
-            </label>
-
-            <button
-              type="submit"
-              className="mt-2 rounded bg-emerald-500/90 px-5 py-3 text-sm font-semibold uppercase tracking-wide transition hover:bg-emerald-500 focus:outline-none disabled:opacity-40"
-              disabled={submitBusy}
-            >
-              {submitBusy ? "Enviando..." : "Enviar para o MAKE"}
-            </button>
-          </form>
-          {authError && (
-            <p className="mt-4 text-sm text-rose-400">{authError}</p>
-          )}
-        </section>
+                {submitBusy ? "Consultando..." : "Consultar"}
+              </Button>
+            </form>
+            {authError && (
+              <p className="mt-4 text-sm text-destructive">{authError}</p>
+            )}
+          </CardContent>
+        </Card>
 
         {latestRun && (
-          <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Último retorno</h2>
-              <span
-                className={
-                  latestRun.success ? "text-emerald-300" : "text-rose-300"
-                }
-              >
-                {latestRun.success ? "sucesso" : "erro"}
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-slate-400">
-              status {latestRun.status ?? "desconhecido"} ·{" "}
-              {new Date(latestRun.timestamp).toLocaleString("pt-BR")}
-            </p>
-            <pre className="mt-4 max-h-64 overflow-auto rounded-md bg-black/50 p-4 text-xs text-slate-100">
-              {JSON.stringify(latestRun.data ?? latestRun.error, null, 2)}
-            </pre>
-          </section>
+          <Card className="w-full max-w-2xl self-center">
+            <CardHeader>
+              <CardTitle>Status da consulta</CardTitle>
+              <CardDescription>
+                status {latestRun.status ?? "desconhecido"} ·{" "}
+                {new Date(latestRun.timestamp).toLocaleString("pt-BR")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium">Resultado:</span>
+                <span
+                  className={
+                    latestRun.success ? "text-emerald-600" : "text-destructive"
+                  }
+                >
+                  {latestRun.success ? "sucesso" : "erro"}
+                </span>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">{latestRun.message}</p>
+            </CardContent>
+          </Card>
         )}
       </main>
     </div>

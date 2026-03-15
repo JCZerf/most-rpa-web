@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 const ACCESS_KEY = process.env.MAKE_FRONT_ACCESS_KEY;
 const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL;
+const MAKE_API_KEY = process.env.Consulta_key;
+const MAKE_API_KEY_HEADER =
+  process.env.MAKE_API_KEY_HEADER || "x-api-key";
 
 const missingEnvResponse = (
   message: string,
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest) {
   let payload: {
     id_consulta?: string;
     consulta?: string;
-    refinar_busca?: string;
+    refinar_busca?: string | boolean;
   };
 
   try {
@@ -41,26 +44,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
   }
 
-  if (!payload?.id_consulta || !payload?.consulta) {
+  if (!payload?.consulta) {
     return NextResponse.json(
-      { error: "Informe id_consulta e consulta" },
+      { error: "Informe o campo de consulta" },
       { status: 400 }
     );
   }
 
   const makePayload = {
-    id_consulta: payload.id_consulta,
     consulta: payload.consulta,
+    id_consulta: payload.id_consulta,
     refinar_busca:
       typeof payload.refinar_busca === "undefined"
         ? "false"
-        : payload.refinar_busca,
+        : String(payload.refinar_busca),
   };
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (MAKE_API_KEY) {
+      headers[MAKE_API_KEY_HEADER] = MAKE_API_KEY;
+    }
+
     const makeResponse = await fetch(MAKE_WEBHOOK_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(makePayload),
     });
 

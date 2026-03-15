@@ -2,6 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const STORAGE_KEY = "make_front_access_key";
 
@@ -48,39 +58,49 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
+    <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 py-16">
-        <header className="space-y-3 rounded-2xl border border-slate-800 bg-white/5 p-6 shadow-lg shadow-slate-900/40">
-          <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
-            MAKE Light
+        <header className="space-y-3 text-center">
+          <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">
+            Transparência Coleta
           </p>
-          <h1 className="text-3xl font-semibold">Acesso ao painel</h1>
-          <p className="text-slate-300">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Acesso ao painel
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Use a chave de autenticação para liberar a tela de consulta e
             proteger o webhook da automação.
           </p>
         </header>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-          <label className="text-sm text-slate-300">
-            Chave de acesso
-            <input
-              className="mt-2 w-full rounded border border-slate-700 bg-slate-950/60 px-4 py-2 text-slate-100 focus:border-white focus:outline-none"
-              type="password"
-              placeholder="Cole sua chave secreta"
-              value={keyValue}
-              onChange={(event) => setKeyValue(event.target.value)}
-            />
-          </label>
-          {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
-          <button
-            className="mt-5 w-full rounded bg-emerald-500/90 px-5 py-3 text-sm font-semibold uppercase tracking-wide transition hover:bg-emerald-500 disabled:opacity-40"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? "Validando..." : "Entrar"}
-          </button>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Entrar</CardTitle>
+            <CardDescription>
+              A chave é validada no servidor antes de liberar o painel.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="access-key">Chave de acesso</Label>
+              <Input
+                id="access-key"
+                type="password"
+                placeholder="Cole sua chave secreta"
+                value={keyValue}
+                onChange={(event) => setKeyValue(event.target.value)}
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button
+              className="w-full bg-black text-white hover:bg-black/90"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? "Validando..." : "Entrar"}
+            </Button>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
