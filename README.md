@@ -20,6 +20,31 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Painel de execução do MAKE
+
+O fluxo agora está dividido em duas telas:
+
+- `app/login/page.tsx`: o usuário informa a chave de acesso.
+- `app/consulta/page.tsx`: a consulta com os parâmetros do webhook.
+
+O painel exige:
+
+- **Chave de acesso** (`MAKE_FRONT_ACCESS_KEY`), que liberta o formulário sem um login completo.
+- **URL do webhook** (`MAKE_WEBHOOK_URL`), armazenada apenas no servidor para evitar exposição direta.
+
+O endpoint `app/api/make/route.ts` valida a chave recebida no cabeçalho `x-access-key` e só encaminha as solicitações para o MAKE quando as informações baterem com o ambiente.
+
+### Variáveis de ambiente necessárias
+
+```bash
+MAKE_WEBHOOK_URL=https://hook.make.com/...
+MAKE_FRONT_ACCESS_KEY=sua-chave-secreta
+```
+
+Use um arquivo `.env` local (não versionado) para guardar esses valores. O `.env.example` continua como referência para quem for usar.
+
+Com as variáveis configuradas, execute `npm run dev` e abra `http://localhost:3000` para liberar o painel com a chave e disparar a automação.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
