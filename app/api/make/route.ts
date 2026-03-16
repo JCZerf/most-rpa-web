@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
   let payload: {
     id_consulta?: string;
     consulta?: string;
+    consultas?: string[];
     refinar_busca?: string | boolean;
   };
 
@@ -44,21 +45,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
   }
 
-  if (!payload?.consulta) {
+  const hasList = Array.isArray(payload?.consultas);
+  const consultas = hasList
+    ? payload.consultas
+        ?.map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter((item) => Boolean(item))
+    : [];
+
+  if (consultas && consultas.length > 3) {
     return NextResponse.json(
-      { error: "Informe o campo de consulta" },
+      { error: "Informe no máximo 3 consultas" },
       { status: 400 }
     );
   }
 
-  const makePayload = {
-    consulta: payload.consulta,
-    id_consulta: payload.id_consulta,
-    refinar_busca:
-      typeof payload.refinar_busca === "undefined"
-        ? "false"
-        : String(payload.refinar_busca),
-  };
+  if (!payload?.consulta && (!consultas || consultas.length === 0)) {
+    return NextResponse.json(
+      { error: "Informe ao menos uma consulta" },
+      { status: 400 }
+    );
+  }
+
+  const normalizedConsultas =
+    consultas && consultas.length > 0
+      ? consultas
+      : payload.consulta
+      ? [payload.consulta]
+      : [];
+
+  if (normalizedConsultas.length === 0) {
+    return NextResponse.json(
+      { error: "Informe ao menos uma consulta" },
+      { status: 400 }
+    );
+  }
 
   try {
     const headers: Record<string, string> = {
@@ -72,7 +92,15 @@ export async function POST(request: NextRequest) {
     const makeResponse = await fetch(MAKE_WEBHOOK_URL, {
       method: "POST",
       headers,
-      body: JSON.stringify(makePayload),
+      body: JSON.stringify({
+        consultas: normalizedConsultas,
+        consulta: normalizedConsultas[0],
+        id_consulta: payload.id_consulta,
+        refinar_busca:
+          typeof payload.refinar_busca === "undefined"
+            ? "false"
+            : String(payload.refinar_busca),
+      }),
     });
 
     const rawResponse = await makeResponse.text();
