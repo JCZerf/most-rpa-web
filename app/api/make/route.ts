@@ -4,7 +4,7 @@ const ACCESS_KEY = process.env.MAKE_FRONT_ACCESS_KEY;
 const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL;
 const MAKE_API_KEY = process.env.Consulta_key;
 const MAKE_API_KEY_HEADER =
-  process.env.MAKE_API_KEY_HEADER || "x-api-key";
+  process.env.MAKE_API_KEY_HEADER || "x-make-apikey";
 
 const missingEnvResponse = (
   message: string,
@@ -94,12 +94,7 @@ export async function POST(request: NextRequest) {
       headers,
       body: JSON.stringify({
         consultas: normalizedConsultas,
-        consulta: normalizedConsultas[0],
-        id_consulta: payload.id_consulta,
-        refinar_busca:
-          typeof payload.refinar_busca === "undefined"
-            ? "false"
-            : String(payload.refinar_busca),
+        refinar_busca: Boolean(payload.refinar_busca),
       }),
     });
 
