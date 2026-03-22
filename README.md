@@ -121,3 +121,22 @@ npm run build
 npm run start
 ```
 
+## Ambiente de Produção
+
+- URL de produção: `https://most-rpa-web.vercel.app/login`
+- Plataforma: Vercel
+
+## Smoke Tests (Pós-Deploy)
+
+Execute esta validação rápida sempre após um novo deploy:
+
+1. Acessar `/login` e autenticar com `MAKE_FRONT_ACCESS_KEY`.
+2. Enviar 1 consulta em `/consulta` e validar redirecionamento para `/consulta/resultado`.
+3. Enviar 2 e 3 consultas na mesma execução e validar renderização de múltiplos cards.
+4. Abrir `Ver detalhes` e validar campos por tipo de benefício:
+   - `Auxílio Emergencial`: mês de disponibilização, parcela, UF, enquadramento, valor, observação.
+   - `Auxílio Brasil`: mês folha, mês referência, valor da parcela, UF, município.
+   - `Beneficiário de Bolsa Família`: mês folha, mês referência, valor, UF, município, dependentes.
+   - `Novo Bolsa Família`: mês folha, mês referência, valor da parcela, UF, município.
+5. Confirmar fallback `N/A` para campos ausentes.
+6. Validar cenário de erro (ex.: chave inválida no front) e mensagem amigável ao usuário.
