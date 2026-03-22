@@ -121,10 +121,3 @@ npm run build
 npm run start
 ```
 
-## Checklist Antes de Subir
-
-- [ ] Variáveis de ambiente configuradas no servidor/plataforma.
-- [ ] `MAKE_WEBHOOK_URL` e `Consulta_key` válidos.
-- [ ] Header em `MAKE_API_KEY_HEADER` alinhado com o cenário MAKE.
-- [ ] Teste de ponta a ponta com 1, 2 e 3 consultas.
-- [ ] Verificação da tela de detalhes para cada tipo de benefício.
