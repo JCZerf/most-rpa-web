@@ -19,36 +19,9 @@ type FormValues = {
   refinar_busca: boolean;
 };
 
-type Pessoa = {
-  nome?: string;
-  cpf?: string;
-  consulta?: string;
-  localidade?: string;
-  total_recursos_favorecidos?: string;
-  quantidade_beneficios?: number;
-};
-
-type Beneficio = {
-  tipo?: string;
-  nis?: string;
-  valor_recebido?: string;
-  detalhe_href?: string;
-  detalhe_evidencia?: string;
-  total_valor_recebido?: number;
-  total_valor_recebido_formatado?: string;
-};
-
-type ConsultaResult = {
-  pessoa?: Pessoa;
-  beneficios?: Beneficio[];
-  id_consulta?: string;
-  data_hora_consulta?: string;
-};
-
 type RunResult = {
   timestamp: string;
   success: boolean;
-  status?: number;
   message: string;
 };
 
@@ -58,8 +31,8 @@ const DEFAULT_FORM: FormValues = {
 };
 
 const MAX_CONSULTAS = 3;
-
 const STORAGE_KEY = "make_front_access_key";
+const RESULT_STORAGE_KEY = "make_consulta_resultados";
 
 export default function ConsultaPage() {
   const router = useRouter();
@@ -68,7 +41,6 @@ export default function ConsultaPage() {
   const [submitBusy, setSubmitBusy] = useState(false);
   const [latestRun, setLatestRun] = useState<RunResult | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [responseData, setResponseData] = useState<any>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -123,18 +95,6 @@ export default function ConsultaPage() {
     });
   };
 
-  const normalizedResults = useMemo(() => {
-    if (!responseData) return [] as ConsultaResult[];
-
-    const candidate = responseData?.data ?? responseData;
-
-    if (Array.isArray(candidate)) return candidate as ConsultaResult[];
-    if (candidate?.data && Array.isArray(candidate.data)) {
-      return candidate.data as ConsultaResult[];
-    }
-    return [candidate as ConsultaResult];
-  }, [responseData]);
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!authKey) {
@@ -143,11 +103,10 @@ export default function ConsultaPage() {
       return;
     }
 
-    // limpa resultados anteriores enquanto a nova consulta é processada
-    setResponseData(null);
     setLatestRun(null);
     setSubmitBusy(true);
     setAuthError(null);
+
     try {
       const consultas = formValues.consultas
         .map((item) => item.trim())
@@ -159,7 +118,6 @@ export default function ConsultaPage() {
           success: false,
           message: "Informe ao menos uma consulta.",
         });
-        setResponseData(null);
         return;
       }
 
@@ -169,14 +127,9 @@ export default function ConsultaPage() {
           success: false,
           message: `Use no máximo ${MAX_CONSULTAS} consultas por vez.`,
         });
-        setResponseData(null);
         return;
       }
 
-      const id_consulta =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `consulta-${Date.now()}`;
       const response = await fetch("/api/make", {
         method: "POST",
         headers: {
@@ -185,9 +138,7 @@ export default function ConsultaPage() {
         },
         body: JSON.stringify({
           consultas,
-          consulta: consultas[0],
           refinar_busca: formValues.refinar_busca,
-          id_consulta,
         }),
       });
 
@@ -198,23 +149,31 @@ export default function ConsultaPage() {
           payload?.error === "O hook do MAKE respondeu com erro"
             ? "A automação recusou a chamada. Verifique a chave/API key do webhook."
             : "Não foi possível realizar a consulta no momento.";
+
         setLatestRun({
           timestamp: new Date().toISOString(),
           success: false,
-          status: response.status,
           message: errorMessage,
         });
-        setResponseData(payload);
         return;
+      }
+
+      const resultData = payload?.data ?? payload ?? null;
+
+      if (resultData) {
+        window.sessionStorage.setItem(
+          RESULT_STORAGE_KEY,
+          JSON.stringify(resultData)
+        );
       }
 
       setLatestRun({
         timestamp: new Date().toISOString(),
         success: true,
-        status: payload?.status ?? response.status,
         message: "Consulta enviada e processada com sucesso.",
       });
-      setResponseData(payload?.data ?? payload ?? null);
+
+      router.push("/consulta/resultado");
     } finally {
       setSubmitBusy(false);
     }
@@ -306,158 +265,9 @@ export default function ConsultaPage() {
                 {submitBusy ? "Consultando..." : "Consultar"}
               </Button>
             </form>
-            {authError && (
-              <p className="mt-4 text-sm text-destructive">{authError}</p>
-            )}
+            {authError && <p className="mt-4 text-sm text-destructive">{authError}</p>}
           </CardContent>
         </Card>
-
-        {latestRun && (
-          <Card className="w-full max-w-2xl self-center">
-            <CardHeader>
-              <CardTitle>Status da consulta</CardTitle>
-              <CardDescription>
-                status {latestRun.status ?? "desconhecido"} ·{" "}
-                {new Date(latestRun.timestamp).toLocaleString("pt-BR")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium">Resultado:</span>
-                <span
-                  className={
-                    latestRun.success ? "text-emerald-600" : "text-destructive"
-                  }
-                >
-                  {latestRun.success ? "sucesso" : "erro"}
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-muted-foreground">{latestRun.message}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {normalizedResults.length > 0 && (
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Retorno da consulta</CardTitle>
-              <CardDescription>
-                {normalizedResults.length} resultado(s) recebido(s)
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {normalizedResults.map((item, index) => (
-                <div
-                  key={item.id_consulta ?? index}
-                  className="space-y-4 rounded-lg border p-4"
-                >
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        Consulta {index + 1}
-                      </p>
-                      <h3 className="text-xl font-semibold">
-                        {item.pessoa?.nome ?? "Nome não informado"}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {item.pessoa?.cpf || item.pessoa?.consulta || "Sem documento"}
-                      </p>
-                    </div>
-                    {item.data_hora_consulta && (
-                      <p className="text-xs text-muted-foreground">
-                        {item.data_hora_consulta}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid gap-3 text-sm md:grid-cols-2">
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground">Localidade</p>
-                      <p className="font-medium">
-                        {item.pessoa?.localidade ?? "Não informado"}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground">Total recebido</p>
-                      <p className="font-medium">
-                        {item.pessoa?.total_recursos_favorecidos ??
-                          item.beneficios?.[0]?.total_valor_recebido_formatado ??
-                          "—"}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground">Qtd. benefícios</p>
-                      <p className="font-medium">
-                        {item.pessoa?.quantidade_beneficios ??
-                          item.beneficios?.length ??
-                          0}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground">ID da consulta</p>
-                      <p className="font-medium break-words">
-                        {item.id_consulta ?? "—"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {item.beneficios && item.beneficios.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-semibold">Benefícios</h4>
-                      <div className="grid gap-3 md:grid-cols-1">
-                        {item.beneficios.map((beneficio, bIndex) => (
-                          <div
-                            key={`${item.id_consulta ?? index}-beneficio-${bIndex}`}
-                            className="space-y-3 rounded-md border p-3"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold">
-                                {beneficio.tipo ?? "Benefício"}
-                              </p>
-                              {beneficio.valor_recebido && (
-                                <span className="text-xs font-medium text-emerald-700">
-                                  {beneficio.valor_recebido}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="space-y-1 text-xs text-muted-foreground">
-                              <p>NIS: {beneficio.nis ?? "—"}</p>
-                              {beneficio.detalhe_href && (
-                                <p className="break-all">
-                                  Link: {beneficio.detalhe_href}
-                                </p>
-                              )}
-                            </div>
-
-                            {beneficio.detalhe_evidencia && (
-                              <div className="space-y-2">
-                                <a
-                                  href={`data:image/png;base64,${beneficio.detalhe_evidencia}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="block overflow-hidden rounded-md border bg-white"
-                                  title="Clique para ampliar em nova aba"
-                                >
-                                  <img
-                                    src={`data:image/png;base64,${beneficio.detalhe_evidencia}`}
-                                    alt={`Evidência ${beneficio.tipo ?? ""}`}
-                                    className="w-full h-auto object-contain"
-                                  />
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-            </CardContent>
-          </Card>
-        )}
       </main>
     </div>
   );

@@ -1,63 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Most RPA Web
 
-## Getting Started
+Interface web para disparar consultas no webhook do MAKE com autenticação por chave de acesso, visualização de resultados e detalhamento por benefício em formato amigável para usuário final.
 
-First, run the development server:
+## Visão Geral
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```S
+O projeto permite:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- autenticar acesso ao painel com uma chave simples (`MAKE_FRONT_ACCESS_KEY`);
+- enviar de 1 a 3 consultas por execução;
+- encaminhar as consultas ao MAKE via backend seguro (sem expor credenciais no front);
+- visualizar resultados em cards resumidos;
+- abrir uma tela de detalhes com informações completas de cada consulta (sem exibição de JSON bruto).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS
+- Componentes UI locais (`components/ui`)
 
-## Painel de execução do MAKE
+## Estrutura Principal
 
-O fluxo agora está dividido em duas telas:
+- `app/login/page.tsx`: tela de autenticação por chave.
+- `app/consulta/page.tsx`: formulário de envio da consulta.
+- `app/consulta/resultado/page.tsx`: lista de resultados.
+- `app/consulta/resultado/detalhe/page.tsx`: detalhes completos da consulta selecionada.
+- `app/api/auth/route.ts`: validação da chave do front.
+- `app/api/make/route.ts`: proxy seguro para o webhook do MAKE.
 
-- `app/login/page.tsx`: o usuário informa a chave de acesso.
-- `app/consulta/page.tsx`: a consulta com os parâmetros do webhook.
+## Variáveis de Ambiente
 
-O painel exige:
-
-- **Chave de acesso** (`MAKE_FRONT_ACCESS_KEY`), que liberta o formulário sem um login completo.
-- **URL do webhook** (`MAKE_WEBHOOK_URL`), armazenada apenas no servidor para evitar exposição direta.
-
-O endpoint `app/api/make/route.ts` valida a chave recebida no cabeçalho `x-access-key` e só encaminha as solicitações para o MAKE quando as informações baterem com o ambiente.
-
-### Variáveis de ambiente necessárias
+Crie um arquivo `.env` baseado em `.env.example`:
 
 ```bash
 MAKE_WEBHOOK_URL=https://hook.make.com/...
 MAKE_FRONT_ACCESS_KEY=sua-chave-secreta
 Consulta_key=sua-chave-make
-MAKE_API_KEY_HEADER=x-api-key
+MAKE_API_KEY_HEADER=x-make-apikey
 ```
 
-Use um arquivo `.env` local (não versionado) para guardar esses valores. O `.env.example` continua como referência para quem for usar.
+Descrição:
 
-Com as variáveis configuradas, execute `npm run dev` e abra `http://localhost:3000` para liberar o painel com a chave e disparar a automação.
+- `MAKE_WEBHOOK_URL`: URL do webhook no MAKE.
+- `MAKE_FRONT_ACCESS_KEY`: chave usada para liberar acesso ao painel.
+- `Consulta_key`: chave enviada ao MAKE no header configurado.
+- `MAKE_API_KEY_HEADER`: nome do header da API key no webhook (padrão recomendado: `x-make-apikey`).
 
-## Learn More
+## Como Rodar Localmente
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Acesse: `http://localhost:3000`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Fluxo da Aplicação
 
-## Deploy on Vercel
+1. Usuário entra em `/login` e informa a chave de acesso.
+2. Em `/consulta`, preenche entre 1 e 3 consultas.
+3. O front chama `POST /api/make` com:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```json
+{
+  "consultas": ["04031769644", "A ANNE CHRISTINE SILVA RIBEIRO"],
+  "refinar_busca": true
+}
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. O backend valida a chave (`x-access-key`) e encaminha ao webhook MAKE com `Consulta_key` no header configurado.
+5. Em sucesso, o front redireciona para `/consulta/resultado`.
+6. O usuário pode abrir `/consulta/resultado/detalhe?i=<index>` para ver os dados completos da consulta.
+
+## Contrato com o MAKE
+
+### Entrada enviada ao webhook
+
+- Header de autenticação: `MAKE_API_KEY_HEADER: Consulta_key`
+- Body:
+
+```json
+{
+  "consultas": ["..."],
+  "refinar_busca": true
+}
+```
+
+### Resposta esperada (resumo)
+
+A aplicação está preparada para respostas no formato:
+
+- `data.resultados[]`, contendo `resultado.pessoa` e `resultado.beneficios[]`.
+
+## Mapeamento de Benefícios (Front + Back)
+
+A tela de detalhes usa mapeamento específico por tipo de benefício (não usa um layout único para todos):
+
+- `Auxílio Emergencial`:
+  - parcelas com `mes_disponibilizacao`, `parcela`, `uf`, `enquadramento`, `valor`, `observacao`.
+- `Auxílio Brasil`:
+  - parcelas com `mes_folha`, `mes_referencia`, `uf`, `municipio`, `valor_parcela` (fallback `valor`).
+- `Beneficiário de Bolsa Família`:
+  - parcelas com `mes_folha`, `mes_referencia`, `uf`, `municipio`, `valor`, `quantidade_dependentes`.
+- `Novo Bolsa Família`:
+  - parcelas com `mes_folha`, `mes_referencia`, `uf`, `municipio`, `valor_parcela` (fallback `valor`).
+
+Quando um campo não existe, a interface exibe `N/A`.
+
+## Segurança
+
+- Credenciais do MAKE ficam apenas no backend (`app/api/make/route.ts`).
+- O front nunca chama diretamente o webhook externo.
+- Acesso ao painel protegido por chave de sessão local (`localStorage`).
+
+## Build de Produção
+
+```bash
+npm run build
+npm run start
+```
+
+## Checklist Antes de Subir
+
+- [ ] Variáveis de ambiente configuradas no servidor/plataforma.
+- [ ] `MAKE_WEBHOOK_URL` e `Consulta_key` válidos.
+- [ ] Header em `MAKE_API_KEY_HEADER` alinhado com o cenário MAKE.
+- [ ] Teste de ponta a ponta com 1, 2 e 3 consultas.
+- [ ] Verificação da tela de detalhes para cada tipo de benefício.
