@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -167,7 +167,7 @@ const isAuxilioEmergencial = (tipo?: string) =>
 const isAuxilioBrasil = (tipo?: string) =>
   normalizeTipo(tipo) === "auxilio brasil";
 
-export default function ConsultaDetalhePage() {
+function ConsultaDetalheContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -466,5 +466,26 @@ export default function ConsultaDetalhePage() {
         </Card>
       </main>
     </div>
+  );
+}
+
+export default function ConsultaDetalhePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background text-foreground">
+          <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-12">
+            <Card className="w-full">
+              <CardHeader>
+                <CardTitle>Carregando detalhes...</CardTitle>
+                <CardDescription>Aguarde um instante.</CardDescription>
+              </CardHeader>
+            </Card>
+          </main>
+        </div>
+      }
+    >
+      <ConsultaDetalheContent />
+    </Suspense>
   );
 }
